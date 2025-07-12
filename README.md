@@ -29,6 +29,5 @@ ReWear is a web-based platform that enables users to exchange unused clothing th
 - `src/pages/` – Main screens
 - `src/styles/` – CSS modules for each page
 
-## Wireframes
-See `/attachments` for Excalidraw wireframes.
+
 # ReWear
