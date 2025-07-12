@@ -1,0 +1,7 @@
+.stats {
+    flex: 1;
+    background: #222;
+    border-radius: 1rem;
+    padding: 1rem;
+    min-height: 60px;
+}

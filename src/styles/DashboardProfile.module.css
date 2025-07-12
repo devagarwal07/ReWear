@@ -1,0 +1,21 @@
+.profileSection {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #333;
+}
+
+.info {
+    flex: 1;
+    background: #222;
+    border-radius: 1rem;
+    padding: 1rem;
+    min-height: 60px;
+}
