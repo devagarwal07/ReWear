@@ -2,9 +2,14 @@ import ClothingItem from '../models/ClothingItem.js';
 import User from '../models/User.js';
 import { uploadImage } from '../services/cloudinaryService.js';
 import fs from 'fs';
+import mongoose from 'mongoose';
 
 export const createItem = async (req, res) => {
     try {
+        // Validate uploader is a valid ObjectId
+        if (!mongoose.Types.ObjectId.isValid(req.body.uploader)) {
+            return res.status(400).json({ error: 'Invalid uploader: must be a valid MongoDB ObjectId.' });
+        }
         const item = new ClothingItem(req.body);
         await item.save();
         // Add the item to the user's listings array

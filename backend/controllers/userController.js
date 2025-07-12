@@ -37,3 +37,19 @@ export const registerClerkUser = async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 };
+
+// Update user profile
+export const updateUserProfile = async (req, res) => {
+    try {
+        const { clerkId, name, email, phone, address, avatar } = req.body;
+        const user = await User.findOneAndUpdate(
+            { clerkId },
+            { $set: { name, email, phone, address, avatar } },
+            { new: true }
+        );
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json({ success: true, user });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};

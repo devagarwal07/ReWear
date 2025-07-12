@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import styles from './Navbar.module.css';
+import {
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from '@clerk/clerk-react';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -37,12 +44,11 @@ const Navbar = () => {
           </div>
           <span className={styles.logoText}>ReWear</span>
         </Link>
-        
         <div className={`${styles.navMenu} ${isMenuOpen ? styles.active : ''}`}>
           <ul className={styles.navLinks}>
             <li>
-              <Link 
-                to="/" 
+              <Link
+                to="/"
                 className={`${styles.navLink} ${isActive('/') ? styles.activeLink : ''}`}
                 onClick={closeMenu}
               >
@@ -51,8 +57,8 @@ const Navbar = () => {
               </Link>
             </li>
             <li>
-              <Link 
-                to="/item-listing" 
+              <Link
+                to="/item-listing"
                 className={`${styles.navLink} ${isActive('/item-listing') ? styles.activeLink : ''}`}
                 onClick={closeMenu}
               >
@@ -61,8 +67,8 @@ const Navbar = () => {
               </Link>
             </li>
             <li>
-              <a 
-                href="#categories" 
+              <a
+                href="#categories"
                 className={styles.navLink}
                 onClick={closeMenu}
               >
@@ -71,18 +77,18 @@ const Navbar = () => {
               </a>
             </li>
             <li>
-              <a 
-                href="#about" 
+              <Link
+                to="/dashboard"
                 className={styles.navLink}
                 onClick={closeMenu}
               >
-                <span className={styles.linkIcon}>ℹ️</span>
-                <span>About</span>
-              </a>
+                <span className={styles.linkIcon}>📊</span>
+                <span>Dashboard</span>
+              </Link>
             </li>
             <li>
-              <a 
-                href="#contact" 
+              <a
+                href="#contact"
                 className={styles.navLink}
                 onClick={closeMenu}
               >
@@ -91,30 +97,46 @@ const Navbar = () => {
               </a>
             </li>
             <li>
-              <Link 
-                to="/login" 
-                className={`${styles.navLink} ${styles.loginLink} ${isActive('/login') ? styles.activeLink : ''}`}
+              <Link
+                to="/add-item"
+                className={styles.navLink}
                 onClick={closeMenu}
               >
-                <span className={styles.linkIcon}>👤</span>
-                <span>Login</span>
+                <span className={styles.linkIcon}>➕</span>
+                <span>Add Item</span>
               </Link>
             </li>
             <li>
-              <Link 
-                to="/register" 
-                className={`${styles.navLink} ${styles.ctaNav}`}
-                onClick={closeMenu}
-              >
-                <span className={styles.linkIcon}>✨</span>
-                <span>Sign Up</span>
-              </Link>
+              <SignedOut>
+                <SignInButton>
+                  <span className={styles.navLink} style={{ cursor: 'pointer' }}>
+                    <span className={styles.linkIcon}>👤</span>
+                    <span>Login</span>
+                  </span>
+                </SignInButton>
+              </SignedOut>
+            </li>
+            <li>
+              <SignedOut>
+                <SignUpButton>
+                  <span className={styles.navLink} style={{ cursor: 'pointer' }}>
+                    <span className={styles.linkIcon}>✨</span>
+                    <span>Sign Up</span>
+                  </span>
+                </SignUpButton>
+              </SignedOut>
+            </li>
+            <li>
+              <SignedIn>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <UserButton appearance={{ elements: { avatarBox: { width: 32, height: 32 } } }} afterSignOutUrl="/" />
+                </div>
+              </SignedIn>
             </li>
           </ul>
         </div>
-
-        <div 
-          className={`${styles.hamburger} ${isMenuOpen ? styles.active : ''}`} 
+        <div
+          className={`${styles.hamburger} ${isMenuOpen ? styles.active : ''}`}
           onClick={toggleMenu}
           aria-label="Toggle menu"
         >

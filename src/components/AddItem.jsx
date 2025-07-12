@@ -1,7 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import styles from "../styles/AddItem.module.css";
+import { createItem, uploadItemImage } from "../api";
+import { useAuth } from "../auth/AuthContext";
 
 export default function AddItem() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -10,18 +16,47 @@ export default function AddItem() {
     size: "",
     condition: "",
     tags: "",
+    price: "",
+    brand: "",
   });
+
   const [images, setImages] = useState([null, null, null, null, null]);
   const [previews, setPreviews] = useState([null, null, null, null, null]);
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  // Handle drag events
+  const handleDrag = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  }, []);
+
+  // Handle drop events
+  const handleDrop = useCallback((e, index) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleImageChange(index, e.dataTransfer.files[0]);
+    }
+  }, []);
 
   // Remove image handler
   const removeImage = (index) => {
     const newImages = [...images];
     const newPreviews = [...previews];
+
     if (newPreviews[index]) {
       URL.revokeObjectURL(newPreviews[index]);
     }
+
     newImages[index] = null;
     newPreviews[index] = null;
     setImages(newImages);
@@ -31,17 +66,24 @@ export default function AddItem() {
   // Handle text field changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    setForm(prev => ({ ...prev, [name]: value }));
+
     // Clear error when user starts typing
     if (errors[name]) {
-      setErrors({ ...errors, [name]: "" });
+      setErrors(prev => ({ ...prev, [name]: "" }));
     }
   };
 
   // Handle image input and preview
   const handleImageChange = (index, file) => {
     if (!file) return;
-    
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert("Please select a valid image file");
+      return;
+    }
+
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert("Image size should be less than 5MB");
@@ -50,12 +92,12 @@ export default function AddItem() {
 
     const newImages = [...images];
     const newPreviews = [...previews];
-    
+
     // Revoke previous URL to prevent memory leaks
     if (newPreviews[index]) {
       URL.revokeObjectURL(newPreviews[index]);
     }
-    
+
     newImages[index] = file;
     newPreviews[index] = URL.createObjectURL(file);
     setImages(newImages);
@@ -65,27 +107,56 @@ export default function AddItem() {
   // Form validation
   const validateForm = () => {
     const newErrors = {};
+
     if (!form.title.trim()) newErrors.title = "Title is required";
     if (!form.description.trim()) newErrors.description = "Description is required";
     if (!form.category) newErrors.category = "Category is required";
     if (!form.type.trim()) newErrors.type = "Type is required";
     if (!form.size.trim()) newErrors.size = "Size is required";
     if (!form.condition) newErrors.condition = "Condition is required";
+    if (!form.brand.trim()) newErrors.brand = "Brand is required";
+    if (!form.price.trim()) newErrors.price = "Price is required";
     if (!previews[0]) newErrors.mainImage = "Main image is required";
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validateForm()) {
-      // Here you would typically send data to your backend
-      console.log("Form data:", form);
-      console.log("Images:", images);
-      alert("Item listed successfully!");
-      
+
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // Upload images and get URLs
+      const imageUrls = [];
+      for (let i = 0; i < images.length; i++) {
+        if (images[i]) {
+          const res = await uploadItemImage(images[i]);
+          imageUrls.push(res.url);
+        }
+      }
+
+      // Prepare tags as array
+      const tagsArr = form.tags
+        ? form.tags.split(',').map((t) => t.trim()).filter(Boolean)
+        : [];
+
+      // Prepare payload
+      const payload = {
+        ...form,
+        tags: tagsArr,
+        images: imageUrls,
+        price: Number(form.price),
+        uploader: user?._id, // Set uploader from auth context
+      };
+
+      await createItem(payload);
+      alert("Item listed successfully! 🎉");
+      navigate("/dashboard");
       // Reset form
       setForm({
         title: "",
@@ -95,271 +166,339 @@ export default function AddItem() {
         size: "",
         condition: "",
         tags: "",
+        price: "",
+        brand: "",
       });
       setImages([null, null, null, null, null]);
       setPreviews([null, null, null, null, null]);
+      setErrors({});
+    } catch (error) {
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className={styles.container}>
       {/* Header */}
-      <header className={styles.header} role="banner">
-        <div className={styles.logo}>ReWear</div>
-        <nav className={styles.nav} aria-label="Primary navigation">
-          <a href="/" className={styles.navLink}>Home</a>
-          <a href="/browse" className={styles.navLink}>Browse Items</a>
-          <a href="/list" className={styles.navLink}>List an Item</a>
-          <a href="/dashboard" className={styles.navLink}>Dashboard</a>
-        </nav>
-        <div className={styles.searchContainer}>
-          <input
-            className={styles.searchBar}
-            type="search"
-            placeholder="Search items..."
-            aria-label="Search items"
-          />
+      <header className={styles.header}>
+        <div className={styles.headerContent}>
+          <h1 className={styles.pageTitle}>Add New Item</h1>
+          <div className={styles.headerSpacer}></div>
         </div>
       </header>
 
+      {/* Search Bar */}
+      <div className={styles.searchSection}>
+        <div className={styles.searchBar}>
+          <input
+            type="text"
+            placeholder="Search existing items..."
+            className={styles.searchInput}
+          />
+          <span className={styles.searchIcon}>🔍</span>
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className={styles.main}>
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <h1 className={styles.heading}>List a New Item</h1>
-            <p className={styles.subheading}>Share your pre-loved clothing with the ReWear community</p>
+        <div className={styles.contentWrapper}>
+          <div className={styles.pageHeader}>
+            <h2 className={styles.mainTitle}>List Your Item</h2>
+            <p className={styles.subtitle}>Share your pre-loved items with the community</p>
           </div>
 
           <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.formGrid}>
-              {/* Main Image Upload */}
+            <div className={styles.formLayout}>
+              {/* Left Column - Images */}
               <div className={styles.imageSection}>
-                <label className={styles.imageUploadLabel}>
-                  {previews[0] ? (
-                    <div className={styles.imagePreviewWrapper}>
-                      <img src={previews[0]} alt="Main" className={styles.mainImage} />
-                      <button
-                        className={styles.removeImageBtn}
-                        type="button"
-                        onClick={() => removeImage(0)}
-                        aria-label="Remove main image"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ) : (
-                    <div className={styles.imagePlaceholder}>
-                      <div className={styles.uploadIcon}>📷</div>
-                      <span className={styles.uploadText}>Add Main Image</span>
-                      <span className={styles.uploadSubtext}>JPG, PNG up to 5MB</span>
-                    </div>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: "none" }}
-                    onChange={(e) => handleImageChange(0, e.target.files[0])}
-                  />
-                </label>
-                {errors.mainImage && <span className={styles.error}>{errors.mainImage}</span>}
-              </div>
-
-              {/* Product Details */}
-              <div className={styles.detailsPanel}>
-                <div className={styles.inputGroup}>
-                  <label className={styles.label}>
-                    Title *
+                {/* Main Image */}
+                <div className={styles.mainImageContainer}>
+                  <label
+                    className={`${styles.imageUploadLabel} ${dragActive ? styles.dragActive : ''}`}
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={(e) => handleDrop(e, 0)}
+                  >
                     <input
-                      type="text"
-                      name="title"
-                      value={form.title}
-                      onChange={handleChange}
-                      required
-                      maxLength={60}
-                      placeholder="e.g. Blue Denim Jacket"
-                      className={`${styles.input} ${errors.title ? styles.inputError : ''}`}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageChange(0, e.target.files[0])}
+                      className={styles.hiddenInput}
                     />
-                    {errors.title && <span className={styles.error}>{errors.title}</span>}
-                  </label>
-                </div>
-
-                <div className={styles.inputGroup}>
-                  <label className={styles.label}>
-                    Description *
-                    <textarea
-                      name="description"
-                      value={form.description}
-                      onChange={handleChange}
-                      required
-                      maxLength={500}
-                      placeholder="Describe your item in detail..."
-                      rows={4}
-                      className={`${styles.textarea} ${errors.description ? styles.inputError : ''}`}
-                    />
-                    <span className={styles.charCount}>{form.description.length}/500</span>
-                    {errors.description && <span className={styles.error}>{errors.description}</span>}
-                  </label>
-                </div>
-
-                <div className={styles.inputRow}>
-                  <div className={styles.inputGroup}>
-                    <label className={styles.label}>
-                      Category *
-                      <select
-                        name="category"
-                        value={form.category}
-                        onChange={handleChange}
-                        required
-                        className={`${styles.select} ${errors.category ? styles.inputError : ''}`}
-                      >
-                        <option value="">Select category</option>
-                        <option value="Jacket">Jacket</option>
-                        <option value="Shirt">Shirt</option>
-                        <option value="Dress">Dress</option>
-                        <option value="Pants">Pants</option>
-                        <option value="Skirt">Skirt</option>
-                        <option value="Shoes">Shoes</option>
-                        <option value="Accessories">Accessories</option>
-                        <option value="Other">Other</option>
-                      </select>
-                      {errors.category && <span className={styles.error}>{errors.category}</span>}
-                    </label>
-                  </div>
-
-                  <div className={styles.inputGroup}>
-                    <label className={styles.label}>
-                      Size *
-                      <input
-                        type="text"
-                        name="size"
-                        value={form.size}
-                        onChange={handleChange}
-                        required
-                        maxLength={10}
-                        placeholder="e.g. M, L, 32"
-                        className={`${styles.input} ${errors.size ? styles.inputError : ''}`}
-                      />
-                      {errors.size && <span className={styles.error}>{errors.size}</span>}
-                    </label>
-                  </div>
-                </div>
-
-                <div className={styles.inputRow}>
-                  <div className={styles.inputGroup}>
-                    <label className={styles.label}>
-                      Type *
-                      <input
-                        type="text"
-                        name="type"
-                        value={form.type}
-                        onChange={handleChange}
-                        required
-                        maxLength={30}
-                        placeholder="e.g. Denim, Cotton, Wool"
-                        className={`${styles.input} ${errors.type ? styles.inputError : ''}`}
-                      />
-                      {errors.type && <span className={styles.error}>{errors.type}</span>}
-                    </label>
-                  </div>
-
-                  <div className={styles.inputGroup}>
-                    <label className={styles.label}>
-                      Condition *
-                      <select
-                        name="condition"
-                        value={form.condition}
-                        onChange={handleChange}
-                        required
-                        className={`${styles.select} ${errors.condition ? styles.inputError : ''}`}
-                      >
-                        <option value="">Select condition</option>
-                        <option value="New">New with tags</option>
-                        <option value="Like New">Like new</option>
-                        <option value="Gently Used">Gently used</option>
-                        <option value="Used">Used</option>
-                        <option value="Well Worn">Well worn</option>
-                      </select>
-                      {errors.condition && <span className={styles.error}>{errors.condition}</span>}
-                    </label>
-                  </div>
-                </div>
-
-                <div className={styles.inputGroup}>
-                  <label className={styles.label}>
-                    Tags
-                    <input
-                      type="text"
-                      name="tags"
-                      value={form.tags}
-                      onChange={handleChange}
-                      placeholder="e.g. blue, vintage, summer, casual"
-                      maxLength={100}
-                      className={styles.input}
-                    />
-                    <span className={styles.helpText}>Separate tags with commas to help others find your item</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Additional Images Gallery */}
-            <div className={styles.gallerySection}>
-              <h3 className={styles.galleryTitle}>Additional Images</h3>
-              <p className={styles.gallerySubtitle}>Add up to 4 more photos to showcase your item</p>
-              <div className={styles.galleryRow}>
-                {[1, 2, 3, 4].map((idx) => (
-                  <label className={styles.galleryThumb} key={idx}>
-                    {previews[idx] ? (
+                    {previews[0] ? (
                       <div className={styles.imagePreviewWrapper}>
-                        <img src={previews[idx]} alt={`Gallery ${idx}`} />
+                        <img
+                          src={previews[0]}
+                          alt="Main product"
+                          className={styles.mainImage}
+                        />
                         <button
-                          className={styles.removeImageBtn}
                           type="button"
-                          onClick={() => removeImage(idx)}
-                          aria-label={`Remove image ${idx}`}
+                          onClick={() => removeImage(0)}
+                          className={styles.removeImageBtn}
                         >
                           ×
                         </button>
                       </div>
                     ) : (
                       <div className={styles.imagePlaceholder}>
-                        <div className={styles.uploadIcon}>+</div>
-                        <span className={styles.uploadText}>Add Image</span>
+                        <div className={styles.uploadIcon}>📷</div>
+                        <div className={styles.uploadText}>Main Product Image</div>
+                        <div className={styles.uploadSubtext}>
+                          Drag & drop or click to upload
+                        </div>
                       </div>
                     )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      style={{ display: "none" }}
-                      onChange={(e) => handleImageChange(idx, e.target.files[0])}
-                    />
                   </label>
-                ))}
+                  {errors.mainImage && <div className={styles.error}>{errors.mainImage}</div>}
+                </div>
+
+                {/* Additional Images */}
+                <div className={styles.additionalImages}>
+                  <h3 className={styles.sectionTitle}>Additional Images</h3>
+                  <div className={styles.thumbnailGrid}>
+                    {[1, 2, 3, 4].map((index) => (
+                      <label key={index} className={styles.thumbnailLabel}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageChange(index, e.target.files[0])}
+                          className={styles.hiddenInput}
+                        />
+                        {previews[index] ? (
+                          <div className={styles.thumbnailWrapper}>
+                            <img
+                              src={previews[index]}
+                              alt={`Product ${index + 1}`}
+                              className={styles.thumbnail}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className={styles.removeThumbnailBtn}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ) : (
+                          <div className={styles.thumbnailPlaceholder}>
+                            <span>+</span>
+                          </div>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* Submit Button */}
-            <div className={styles.submitSection}>
-              <button className={styles.submitBtn} type="submit">
-                List Item
-              </button>
+              {/* Right Column - Form Details */}
+              <div className={styles.detailsSection}>
+                <div className={styles.formCard}>
+                  <h3 className={styles.cardTitle}>Item Details</h3>
+
+                  <div className={styles.formGrid}>
+                    {/* Title */}
+                    <div className={styles.inputGroup}>
+                      <label className={styles.label}>
+                        Item Title *
+                        <input
+                          type="text"
+                          name="title"
+                          value={form.title}
+                          onChange={handleChange}
+                          className={`${styles.input} ${errors.title ? styles.inputError : ''}`}
+                          placeholder="Enter item title"
+                        />
+                      </label>
+                      {errors.title && <div className={styles.error}>{errors.title}</div>}
+                    </div>
+
+                    {/* Brand & Price */}
+                    <div className={styles.inputRow}>
+                      <div className={styles.inputGroup}>
+                        <label className={styles.label}>
+                          Brand *
+                          <input
+                            type="text"
+                            name="brand"
+                            value={form.brand}
+                            onChange={handleChange}
+                            className={`${styles.input} ${errors.brand ? styles.inputError : ''}`}
+                            placeholder="Enter brand name"
+                          />
+                        </label>
+                        {errors.brand && <div className={styles.error}>{errors.brand}</div>}
+                      </div>
+
+                      <div className={styles.inputGroup}>
+                        <label className={styles.label}>
+                          Price *
+                          <input
+                            type="number"
+                            name="price"
+                            value={form.price}
+                            onChange={handleChange}
+                            className={`${styles.input} ${errors.price ? styles.inputError : ''}`}
+                            placeholder="Enter price"
+                          />
+                        </label>
+                        {errors.price && <div className={styles.error}>{errors.price}</div>}
+                      </div>
+                    </div>
+
+                    {/* Category & Type */}
+                    <div className={styles.inputRow}>
+                      <div className={styles.inputGroup}>
+                        <label className={styles.label}>
+                          Category *
+                          <select
+                            name="category"
+                            value={form.category}
+                            onChange={handleChange}
+                            className={`${styles.select} ${errors.category ? styles.inputError : ''}`}
+                          >
+                            <option value="">Select category</option>
+                            <option value="clothing">Clothing</option>
+                            <option value="accessories">Accessories</option>
+                            <option value="shoes">Shoes</option>
+                            <option value="bags">Bags</option>
+                          </select>
+                        </label>
+                        {errors.category && <div className={styles.error}>{errors.category}</div>}
+                      </div>
+
+                      <div className={styles.inputGroup}>
+                        <label className={styles.label}>
+                          Type *
+                          <input
+                            type="text"
+                            name="type"
+                            value={form.type}
+                            onChange={handleChange}
+                            className={`${styles.input} ${errors.type ? styles.inputError : ''}`}
+                            placeholder="e.g., T-shirt, Jeans"
+                          />
+                        </label>
+                        {errors.type && <div className={styles.error}>{errors.type}</div>}
+                      </div>
+                    </div>
+
+                    {/* Size & Condition */}
+                    <div className={styles.inputRow}>
+                      <div className={styles.inputGroup}>
+                        <label className={styles.label}>
+                          Size *
+                          <select
+                            name="size"
+                            value={form.size}
+                            onChange={handleChange}
+                            className={`${styles.select} ${errors.size ? styles.inputError : ''}`}
+                          >
+                            <option value="">Select size</option>
+                            <option value="XS">XS</option>
+                            <option value="S">S</option>
+                            <option value="M">M</option>
+                            <option value="L">L</option>
+                            <option value="XL">XL</option>
+                            <option value="XXL">XXL</option>
+                          </select>
+                        </label>
+                        {errors.size && <div className={styles.error}>{errors.size}</div>}
+                      </div>
+
+                      <div className={styles.inputGroup}>
+                        <label className={styles.label}>
+                          Condition *
+                          <select
+                            name="condition"
+                            value={form.condition}
+                            onChange={handleChange}
+                            className={`${styles.select} ${errors.condition ? styles.inputError : ''}`}
+                          >
+                            <option value="">Select condition</option>
+                            <option value="new">New with tags</option>
+                            <option value="like-new">Like new</option>
+                            <option value="good">Good</option>
+                            <option value="fair">Fair</option>
+                          </select>
+                        </label>
+                        {errors.condition && <div className={styles.error}>{errors.condition}</div>}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div className={styles.inputGroup}>
+                      <label className={styles.label}>
+                        Description *
+                        <textarea
+                          name="description"
+                          value={form.description}
+                          onChange={handleChange}
+                          className={`${styles.textarea} ${errors.description ? styles.inputError : ''}`}
+                          placeholder="Describe your item in detail..."
+                          rows="4"
+                        />
+                      </label>
+                      {errors.description && <div className={styles.error}>{errors.description}</div>}
+                      <div className={styles.charCount}>
+                        {form.description.length}/500 characters
+                      </div>
+                    </div>
+
+                    {/* Tags */}
+                    <div className={styles.inputGroup}>
+                      <label className={styles.label}>
+                        Tags (Optional)
+                        <input
+                          type="text"
+                          name="tags"
+                          value={form.tags}
+                          onChange={handleChange}
+                          className={styles.input}
+                          placeholder="e.g., vintage, summer, casual"
+                        />
+                      </label>
+                      <div className={styles.helpText}>
+                        Separate tags with commas to help others find your item
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div >
+            </div >
+
+            {/* Submit Section */}
+            < div className={styles.submitSection} >
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`${styles.submitBtn} ${isSubmitting ? styles.submitting : ''}`}
+              >
+                {
+                  isSubmitting ? (
+                    <>
+                      <span className={styles.spinner}></span>
+                      Listing Item...
+                    </>
+                  ) : (
+                    <>
+                      <span className={styles.btnIcon}>✨</span>
+                      List My Item
+                    </>
+                  )}
+              </button >
               <p className={styles.submitNote}>
-                By listing this item, you agree to our <a href="/terms">Terms of Service</a>
+                By listing your item, you agree to our{" "}
+                <a href="#" className={styles.link}>Terms of Service</a> and{" "}
+                <a href="#" className={styles.link}>Privacy Policy</a>
               </p>
-            </div>
-          </form>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className={styles.footer} role="contentinfo">
-        <div className={styles.footerContent}>
-          <a href="/about" className={styles.footerLink}>About</a>
-          <a href="/contact" className={styles.footerLink}>Contact</a>
-          <a href="/terms" className={styles.footerLink}>Terms</a>
-          <a href="/privacy" className={styles.footerLink}>Privacy</a>
-        </div>
-      </footer>
-    </div>
+            </div >
+          </form >
+        </div >
+      </main >
+    </div >
   );
 }

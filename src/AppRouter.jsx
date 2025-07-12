@@ -8,6 +8,8 @@ import Dashboard from './pages/Dashboard';
 import ProductDetail from './pages/ProductDetail';
 import AdminPanel from './pages/AdminPanel';
 import Onboarding from './pages/Onboarding';
+import Navbar from './components/Navbar/Navbar';
+import AddItem from './components/AddItem';
 import {
     SignedIn,
     SignedOut,
@@ -19,21 +21,15 @@ import {
 export default function AppRouter() {
     return (
         <Router>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '1rem', gap: 12 }}>
-                <SignedOut>
-                    <SignInButton />
-                    <SignUpButton />
-                </SignedOut>
-                <SignedIn>
-                    <UserButton />
-                </SignedIn>
-            </div>
+            <Navbar />
+
             <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/item/:id" element={<ItemListing />} />
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/add-item" element={<AddItem />} />
                 <Route path="/product/:id" element={<ProductDetail />} />
                 <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/onboarding" element={<Onboarding />} />

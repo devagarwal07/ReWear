@@ -1,4 +1,5 @@
 import AppRouter from './AppRouter';
+import Navbar from './components/Navbar/Navbar';
 import './App.css'
 import {
   SignedIn,
@@ -11,6 +12,7 @@ import {
 function App() {
   return (
     <>
+      {/* <Navbar /> */}
       <AppRouter />
     </>
   );

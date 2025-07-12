@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getUserDashboard } from '../api';
+import { getUserDashboard, updateUserProfile } from '../api';
 import { useUser } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
 
 const styles = {
     container: {
@@ -427,6 +428,14 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Profile editing states
+    const [editProfile, setEditProfile] = useState(false);
+    const [editFields, setEditFields] = useState({});
+    const [saving, setSaving] = useState(false);
+    const [editingAvatar, setEditingAvatar] = useState(false);
+
+    const navigate = useNavigate();
+
     useEffect(() => {
         if (!isLoaded || !user) return;
         setLoading(true);
@@ -459,6 +468,51 @@ export default function Dashboard() {
         console.log('Toggle wishlist for item:', id);
     };
 
+    // Helper to calculate profile completion
+    const getProfileCompletion = () => {
+        if (!profile) return 0;
+        const fields = [profile.name, profile.email, profile.phone, profile.address, profile.avatar];
+        const filled = fields.filter(Boolean).length;
+        return Math.round((filled / fields.length) * 100);
+    };
+    const completion = getProfileCompletion();
+    const isProfileComplete = completion === 100;
+
+    // Handle edit field changes
+    const handleEditChange = (e) => {
+        setEditFields({ ...editFields, [e.target.name]: e.target.value });
+    };
+    // Start editing, prefill with current profile
+    const startEditProfile = () => {
+        setEditFields({
+            name: profile?.name || '',
+            email: profile?.email || '',
+            phone: profile?.phone || '',
+            address: profile?.address || '',
+            avatar: profile?.avatar || '',
+            clerkId: user.id
+        });
+        setEditProfile(true);
+    };
+    // Only allow avatar edit via avatar button
+    const handleAvatarEdit = () => {
+        setEditFields({ ...editFields, avatar: profile?.avatar || '' });
+        setEditProfile(true);
+        setEditingAvatar(true);
+    };
+    // Save profile changes
+    const saveProfile = async () => {
+        setSaving(true);
+        try {
+            await updateUserProfile(editFields);
+            setProfile({ ...profile, ...editFields });
+            setEditProfile(false);
+        } catch (err) {
+            alert('Failed to save profile: ' + (err?.response?.data?.error || err.message));
+        }
+        setSaving(false);
+    };
+
     if (loading) {
         return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading dashboard...</div>;
     }
@@ -469,128 +523,148 @@ export default function Dashboard() {
     return (
         <div style={styles.container}>
             {/* Enhanced Header */}
-            <header style={styles.header}>
-                <div style={styles.headerLabel}>ReWear Dashboard</div>
-
-                <div style={styles.breadcrumb}>
-                    <span>Home</span>
-                    <span>›</span>
-                    <span style={{ color: '#007BFF' }}>Dashboard</span>
-                </div>
-
-                <div style={styles.searchContainer}>
-                    <input
-                        type="text"
-                        placeholder="Search items, users, or categories..."
-                        style={{
-                            ...styles.searchBar,
-                            ...(searchFocused ? styles.searchBarFocused : {})
-                        }}
-                        onFocus={() => setSearchFocused(true)}
-                        onBlur={() => setSearchFocused(false)}
-                    />
-
-                    <div style={styles.quickActions}>
-                        <button style={styles.actionBtn}>+ Add Item</button>
-                        <button style={{ ...styles.actionBtn, background: '#28A745' }}>Browse</button>
-                    </div>
-
-                    <button style={styles.notificationBtn}>
-                        🔔
-                        {notifications > 0 && (
-                            <span style={styles.notificationBadge}>{notifications}</span>
-                        )}
-                    </button>
-
-                    <div style={styles.userMenu}>
-                        <div style={{ ...styles.avatar, width: '32px', height: '32px', fontSize: '16px' }}>
-                            👤
-                        </div>
-                        <span style={{ fontSize: '14px', fontWeight: '500' }}>{profile?.name?.split(' ')[0] || 'User'}</span>
-                        <span style={{ fontSize: '12px', color: '#6C757D' }}>▼</span>
-                    </div>
-                </div>
-            </header>
 
             {/* Enhanced Profile Section */}
             <div style={styles.profileSection}>
                 <div style={styles.avatarContainer}>
                     <div style={styles.avatar}>
-                        {profile?.avatar ? (
+                        {editProfile ? (
+                            <>
+                                {editFields.avatar ? (
+                                    <img src={editFields.avatar} alt="avatar preview" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
+                                ) : (
+                                    '👤'
+                                )}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    style={{ marginTop: 8 }}
+                                    onChange={async (e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                                setEditFields({ ...editFields, avatar: reader.result });
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                    }}
+                                />
+                            </>
+                        ) : profile?.avatar ? (
                             <img src={profile.avatar} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
                         ) : (
                             '👤'
                         )}
-                        <button style={styles.avatarUpload}>📷</button>
                     </div>
                     <div style={styles.verificationBadge}>✓ Verified</div>
                 </div>
 
                 <div style={styles.profileInfo}>
+                    {/* Always show Edit Profile button when not editing */}
+                    {!editProfile && (
+                        <button
+                            style={{ ...styles.actionBtn, alignSelf: 'flex-end', marginBottom: 8, background: '#007BFF', color: '#fff' }}
+                            onClick={startEditProfile}
+                        >
+                            Edit Profile
+                        </button>
+                    )}
                     <div style={styles.infoGrid}>
                         <div style={styles.infoField}>
                             <span style={styles.infoLabel}>Full Name</span>
-                            <span style={styles.infoValue}>{profile?.name}</span>
+                            {editProfile ? (
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={editFields.name}
+                                    onChange={handleEditChange}
+                                    style={{ padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+                                />
+                            ) : (
+                                <span style={styles.infoValue}>{profile?.name}</span>
+                            )}
                         </div>
                         <div style={styles.infoField}>
                             <span style={styles.infoLabel}>Email</span>
-                            <span style={styles.infoValue}>{profile?.email}</span>
+                            {editProfile ? (
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={editFields.email}
+                                    onChange={handleEditChange}
+                                    style={{ padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+                                />
+                            ) : (
+                                <span style={styles.infoValue}>{profile?.email}</span>
+                            )}
                         </div>
                         <div style={styles.infoField}>
                             <span style={styles.infoLabel}>Phone</span>
-                            <span style={styles.infoValue}>{profile?.phone || '-'}</span>
+                            {editProfile ? (
+                                <input
+                                    type="text"
+                                    name="phone"
+                                    value={editFields.phone}
+                                    onChange={handleEditChange}
+                                    style={{ padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+                                />
+                            ) : (
+                                <span style={styles.infoValue}>{profile?.phone || '-'}</span>
+                            )}
                         </div>
                         <div style={styles.infoField}>
                             <span style={styles.infoLabel}>Address</span>
-                            <span style={styles.infoValue}>{profile?.address || '-'}</span>
+                            {editProfile ? (
+                                <input
+                                    type="text"
+                                    name="address"
+                                    value={editFields.address}
+                                    onChange={handleEditChange}
+                                    style={{ padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+                                />
+                            ) : (
+                                <span style={styles.infoValue}>{profile?.address || '-'}</span>
+                            )}
                         </div>
                         <div style={styles.infoField}>
                             <span style={styles.infoLabel}>Account Type</span>
                             <span style={styles.infoValue}>{profile?.isAdmin ? 'Admin' : 'Member'}</span>
                         </div>
-                        <div style={styles.profileCompletion}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '14px', fontWeight: '500', color: '#2C3E50' }}>
-                                    Profile Completion
-                                </span>
-                                <span style={{ fontSize: '14px', fontWeight: '600', color: '#28A745' }}>
-                                    {/* Placeholder, calculate as needed */}
-                                    100%
-                                </span>
+                        {/* Show profile completion bar and button only if profile is NOT complete */}
+                        {!isProfileComplete && (
+                            <div style={styles.profileCompletion}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#2C3E50' }}>
+                                        Profile Completion
+                                    </span>
+                                    <span style={{ fontSize: '14px', fontWeight: '600', color: completion === 100 ? '#28A745' : '#FFC107' }}>
+                                        {completion}%
+                                    </span>
+                                </div>
+                                <div style={styles.progressBar}>
+                                    <div
+                                        style={{
+                                            ...styles.progressFill,
+                                            width: `${completion}%`,
+                                            backgroundColor: completion === 100 ? '#28A745' : '#FFC107'
+                                        }}
+                                    />
+                                </div>
+                                {!editProfile && (
+                                    <button style={{ ...styles.actionBtn, marginTop: 12, background: '#FFC107', color: '#2C3E50' }} onClick={startEditProfile}>
+                                        Complete Your Profile
+                                    </button>
+                                )}
                             </div>
-                            <div style={styles.progressBar}>
-                                <div
-                                    style={{
-                                        ...styles.progressFill,
-                                        width: `100%`
-                                    }}
-                                />
-                            </div>
-                        </div>
+                        )}
                     </div>
-
-                    <div style={styles.statsContainer}>
-                        <div style={styles.statCard}>
-                            <div style={{ fontSize: '20px', marginBottom: '4px' }}>📦</div>
-                            <div style={styles.statValue}>{stats?.listingsCount ?? 0}</div>
-                            <div style={styles.statLabel}>Total Items</div>
-                        </div>
-                        <div style={styles.statCard}>
-                            <div style={{ fontSize: '20px', marginBottom: '4px' }}>⭐</div>
-                            <div style={styles.statValue}>{stats?.points ?? 0}</div>
-                            <div style={styles.statLabel}>Points</div>
-                        </div>
-                        <div style={styles.statCard}>
-                            <div style={{ fontSize: '20px', marginBottom: '4px' }}>🔄</div>
-                            <div style={styles.statValue}>{stats?.swapsCount ?? 0}</div>
-                            <div style={styles.statLabel}>Swaps</div>
-                        </div>
-                        <div style={styles.statCard}>
-                            <div style={{ fontSize: '20px', marginBottom: '4px' }}>🛒</div>
-                            <div style={styles.statValue}>{stats?.purchasesCount ?? 0}</div>
-                            <div style={styles.statLabel}>Purchases</div>
-                        </div>
-                    </div>
+                    {/* Always show Save button in edit mode */}
+                    {editProfile && (
+                        <button style={{ ...styles.actionBtn, alignSelf: 'flex-end', marginTop: 16, background: '#28A745', color: '#fff' }} onClick={saveProfile} disabled={saving}>
+                            {saving ? 'Saving...' : 'Save'}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -602,7 +676,7 @@ export default function Dashboard() {
                         <button style={styles.filterBtn}>All Items</button>
                         <button style={styles.filterBtn}>Active</button>
                         <button style={styles.filterBtn}>Sold</button>
-                        <button style={{ ...styles.filterBtn, background: '#007BFF', color: '#FFFFFF' }}>
+                        <button style={{ ...styles.filterBtn, background: '#007BFF', color: '#FFFFFF' }} onClick={() => navigate('/add-item')}>
                             + Add New
                         </button>
                     </div>
@@ -616,7 +690,7 @@ export default function Dashboard() {
                             <div style={styles.emptyStateDescription}>
                                 You have not listed any items yet. Add your first item to get started!
                             </div>
-                            <button style={styles.emptyStateAction}>+ Add Item</button>
+                            <button style={styles.emptyStateAction} onClick={() => window.location.href = '/add-item'}>+ Add Item</button>
                         </div>
                     ) : (
                         myListings.map((item) => (
@@ -633,13 +707,10 @@ export default function Dashboard() {
                                 >
                                     {'🤍'}
                                 </button>
-
                                 <div style={styles.cardImage}>{item.image ? <img src={item.image} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👕'}</div>
-
                                 <div style={styles.cardContent}>
                                     <div style={styles.cardTitle}>{item.title}</div>
                                     <div style={styles.cardDescription}>{item.description}</div>
-
                                     <div style={styles.cardFooter}>
                                         <div style={styles.cardPrice}>{item.price ? `${item.price} pts` : ''}</div>
                                         <div style={styles.cardActions}>
@@ -685,11 +756,9 @@ export default function Dashboard() {
                                 onMouseLeave={(e) => handleCardHover(e, false)}
                             >
                                 <div style={styles.cardImage}>{item.image ? <img src={item.image} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👚'}</div>
-
                                 <div style={styles.cardContent}>
                                     <div style={styles.cardTitle}>{item.title}</div>
                                     <div style={styles.cardDescription}>{item.description}</div>
-
                                     <div style={styles.cardFooter}>
                                         <div style={styles.cardPrice}>{item.price ? `${item.price} pts` : ''}</div>
                                         <div style={styles.cardActions}>

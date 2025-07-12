@@ -12,6 +12,7 @@ const itemSchema = new mongoose.Schema({
     uploader: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     status: { type: String, default: 'available' }, // available, swapped, reserved
     createdAt: { type: Date, default: Date.now },
+    brand: String,
 });
 
 export default mongoose.model('ClothingItem', itemSchema);

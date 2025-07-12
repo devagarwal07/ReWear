@@ -36,4 +36,10 @@ export const uploadItemImage = async (file) => {
     return res.data;
 };
 
+// Update user profile
+export const updateUserProfile = async (profileData) => {
+    const res = await api.put('/users/update-profile', profileData);
+    return res.data;
+};
+
 export default api;
