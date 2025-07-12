@@ -1,34 +1,33 @@
-/* * {
+/* #root {
+  width: 100%;
   margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+  text-align: center;
 }
-
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: linear-gradient(135deg, #f5f1eb 0%, #e8ddd4 100%);
-  color: #4a3728;
-  line-height: 1.6;
-  min-height: 100vh;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-#root {
-  min-height: 100vh;
-} */
 
 /* Smooth scrolling */
 /* html {
   scroll-behavior: smooth;
 } */
 
-/* Focus styles for accessibility */
-/* button:focus,
-a:focus {
-  outline: 2px solid #d2691e;
-  outline-offset: 2px;
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
 } */
