@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
     name: { type: String, required: true, minlength: 2, maxlength: 50 },
     email: { type: String, required: true, match: /.+@.+\..+/ },
     points: { type: Number, default: 0, min: 0 },
-    avatar: { type: String, match: /^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)$/i, required: false },
+    avatar: { type: String, match: /^https?:\/\/.+/i, required: false },
     phone: { type: String, match: /^\+?[0-9]{10,15}$/, required: false },
     address: { type: String, maxlength: 200, required: false },
     isAdmin: { type: Boolean, default: false },

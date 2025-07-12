@@ -23,3 +23,17 @@ export const getUser = async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 };
+
+export const registerClerkUser = async (req, res) => {
+    try {
+        const { clerkId, name, email, avatar } = req.body;
+        let user = await User.findOne({ clerkId });
+        if (!user) {
+            user = new User({ clerkId, name, email, avatar });
+            await user.save();
+        }
+        res.status(201).json({ success: true, user });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};

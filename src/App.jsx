@@ -10,16 +10,9 @@ import {
 
 function App() {
   return (
-    <header>
-      <SignedOut>
-        <SignInButton />
-        <SignUpButton />
-      </SignedOut>
-      <SignedIn>
-        <UserButton />
-      </SignedIn>
+    <>
       <AppRouter />
-    </header>
+    </>
   );
 }
 

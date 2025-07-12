@@ -1,4 +1,5 @@
 import React from 'react';
+import { SignIn } from '@clerk/clerk-react';
 import styles from '../styles/Login.module.css';
 
 export default function Login() {
@@ -6,9 +7,7 @@ export default function Login() {
         <div className={styles.container}>
             <div className={styles.card}>
                 <div className={styles.avatar}></div>
-                <input className={styles.input} type="text" placeholder="Username" />
-                <input className={styles.input} type="password" placeholder="Password" />
-                <button className={styles.button}>Login</button>
+                <SignIn afterSignInUrl="/onboarding" afterSignUpUrl="/onboarding" />
             </div>
         </div>
     );
