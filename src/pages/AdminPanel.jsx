@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import styles from "../styles/AdminPanel.module.css";
+import api from "../api";
 
 export default function AdminPanel() {
     const [activeMainTab, setActiveMainTab] = useState('users');
@@ -9,204 +10,143 @@ export default function AdminPanel() {
     const [filterCategory, setFilterCategory] = useState('all');
     const [showModal, setShowModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
-    // Sample data for different sections
+    // Real backend data
     const [data, setData] = useState({
-        users: {
-            pending: [
-                {
-                    id: 1,
-                    name: "Sarah Johnson",
-                    email: "sarah.johnson@email.com",
-                    joinDate: "2025-07-10",
-                    avatar: "https://via.placeholder.com/40x40/E3F2FD/1A73E8?text=SJ",
-                    status: "pending",
-                    location: "New York, NY",
-                    itemsListed: 0,
-                    verificationStatus: "Email Pending"
-                },
-                {
-                    id: 2,
-                    name: "Emma Wilson",
-                    email: "emma.wilson@email.com",
-                    joinDate: "2025-07-11",
-                    avatar: "https://via.placeholder.com/40x40/FCE4EC/E91E63?text=EW",
-                    status: "pending",
-                    location: "Los Angeles, CA",
-                    itemsListed: 0,
-                    verificationStatus: "Phone Pending"
-                }
-            ],
-            approved: [
-                {
-                    id: 3,
-                    name: "Michael Chen",
-                    email: "michael.chen@email.com",
-                    joinDate: "2025-07-05",
-                    avatar: "https://via.placeholder.com/40x40/E8F5E8/4CAF50?text=MC",
-                    status: "approved",
-                    location: "San Francisco, CA",
-                    itemsListed: 12,
-                    verificationStatus: "Verified"
-                }
-            ],
-            rejected: [
-                {
-                    id: 4,
-                    name: "Spam User",
-                    email: "spam@fake.com",
-                    joinDate: "2025-07-08",
-                    avatar: "https://via.placeholder.com/40x40/FFEBEE/F44336?text=SU",
-                    status: "rejected",
-                    location: "Unknown",
-                    itemsListed: 0,
-                    verificationStatus: "Rejected",
-                    rejectionReason: "Suspicious activity detected"
-                }
-            ]
-        },
-        listings: {
-            pending: [
-                {
-                    id: 1,
-                    title: "Vintage Denim Jacket",
-                    description: "Classic blue denim jacket in excellent condition",
-                    category: "Jacket",
-                    size: "M",
-                    condition: "Gently Used",
-                    uploader: "sarah.johnson@email.com",
-                    uploaderName: "Sarah Johnson",
-                    uploadDate: "2025-07-10",
-                    images: ["https://via.placeholder.com/150x200/4A90E2/FFFFFF?text=Denim+Jacket"],
-                    status: "pending",
-                    price: "$45",
-                    tags: ["blue", "vintage", "casual"]
-                },
-                {
-                    id: 2,
-                    title: "Summer Floral Dress",
-                    description: "Beautiful summer dress with floral pattern",
-                    category: "Dress",
-                    size: "S",
-                    condition: "Like New",
-                    uploader: "emma.wilson@email.com",
-                    uploaderName: "Emma Wilson",
-                    uploadDate: "2025-07-11",
-                    images: ["https://via.placeholder.com/150x200/E94B3C/FFFFFF?text=Floral+Dress"],
-                    status: "pending",
-                    price: "$32",
-                    tags: ["floral", "summer", "dress"]
-                }
-            ],
-            approved: [
-                {
-                    id: 3,
-                    title: "Black Leather Boots",
-                    description: "Stylish black leather boots",
-                    category: "Shoes",
-                    size: "9",
-                    condition: "Gently Used",
-                    uploader: "michael.chen@email.com",
-                    uploaderName: "Michael Chen",
-                    uploadDate: "2025-07-09",
-                    images: ["https://via.placeholder.com/150x200/2C3E50/FFFFFF?text=Leather+Boots"],
-                    status: "approved",
-                    price: "$78",
-                    tags: ["black", "leather", "formal"]
-                }
-            ],
-            rejected: []
-        },
-        orders: {
-            pending: [
-                {
-                    id: 1,
-                    orderNumber: "ORD-001",
-                    buyer: "Alex Rodriguez",
-                    seller: "Michael Chen",
-                    item: "Black Leather Boots",
-                    amount: "$78",
-                    orderDate: "2025-07-12",
-                    status: "pending",
-                    paymentStatus: "Paid",
-                    shippingStatus: "Processing"
-                }
-            ],
-            approved: [
-                {
-                    id: 2,
-                    orderNumber: "ORD-002",
-                    buyer: "Lisa Thompson",
-                    seller: "Sarah Johnson",
-                    item: "Vintage Denim Jacket",
-                    amount: "$45",
-                    orderDate: "2025-07-10",
-                    status: "approved",
-                    paymentStatus: "Paid",
-                    shippingStatus: "Shipped"
-                }
-            ],
-            rejected: [
-                {
-                    id: 3,
-                    orderNumber: "ORD-003",
-                    buyer: "John Doe",
-                    seller: "Emma Wilson",
-                    item: "Summer Floral Dress",
-                    amount: "$32",
-                    orderDate: "2025-07-08",
-                    status: "rejected",
-                    paymentStatus: "Refunded",
-                    shippingStatus: "Cancelled",
-                    rejectionReason: "Payment dispute"
-                }
-            ]
-        }
+        users: { pending: [], approved: [], rejected: [] },
+        listings: { pending: [], approved: [], rejected: [] },
+        orders: { pending: [], approved: [], rejected: [] },
     });
 
-    const handleApprove = (itemId) => {
-        const currentData = data[activeMainTab];
-        const item = currentData.pending.find(item => item.id === itemId);
-        if (item) {
-            setData(prev => ({
-                ...prev,
-                [activeMainTab]: {
-                    ...prev[activeMainTab],
-                    pending: prev[activeMainTab].pending.filter(item => item.id !== itemId),
-                    approved: [...prev[activeMainTab].approved, { ...item, status: 'approved' }]
-                }
-            }));
-            setSelectedItems(prev => prev.filter(id => id !== itemId));
+    // Helper to normalize backend _id to id for all entities
+    function normalizeId(obj) {
+        if (!obj) return obj;
+        if (Array.isArray(obj)) return obj.map(normalizeId);
+        const copy = { ...obj };
+        if (copy._id) copy.id = copy._id;
+        // For listings, uploader may be an object
+        if (copy.uploader && typeof copy.uploader === 'object') {
+            copy.uploaderName = copy.uploader.name || '';
+            copy.uploader = copy.uploader.email || copy.uploader._id || '';
+        }
+        // For orders/swaps, buyer/seller fields
+        if (copy.from && typeof copy.from === 'object') {
+            copy.seller = copy.from.name || '';
+        }
+        if (copy.to && typeof copy.to === 'object') {
+            copy.buyer = copy.to.name || '';
+        }
+        if (copy.item && typeof copy.item === 'object') {
+            copy.item = copy.item.title || '';
+            copy.amount = copy.item.price || '';
+        }
+        // Fallbacks for missing fields
+        if (!copy.status && copy.isApproved !== undefined) {
+            copy.status = copy.isRemoved || copy.isSpam ? 'rejected' : (copy.isApproved ? 'approved' : 'pending');
+        }
+        return copy;
+    }
+
+    // Fetch admin dashboard data from backend
+    const fetchAdminData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await api.get('/dashboard/admin');
+            // Split users/listings/orders by status
+            const users = { pending: [], approved: [], rejected: [] };
+            res.data.users.map(normalizeId).forEach(u => {
+                if (u.status === 'pending') users.pending.push(u);
+                else if (u.status === 'rejected') users.rejected.push(u);
+                else users.approved.push(u);
+            });
+            const listings = { pending: [], approved: [], rejected: [] };
+            res.data.listings.map(normalizeId).forEach(l => {
+                if (l.status === 'rejected') listings.rejected.push(l);
+                else if (l.status === 'approved') listings.approved.push(l);
+                else listings.pending.push(l);
+            });
+            const orders = { pending: [], approved: [], rejected: [] };
+            res.data.swaps.map(normalizeId).forEach(o => {
+                if (o.status === 'pending') orders.pending.push(o);
+                else if (o.status === 'rejected') orders.rejected.push(o);
+                else orders.approved.push(o);
+            });
+            setData({ users, listings, orders });
+        } catch (err) {
+            setError('Failed to load admin data');
+        } finally {
+            setLoading(false);
         }
     };
 
-    const handleReject = (itemId, reason = '') => {
-        const currentData = data[activeMainTab];
-        const item = currentData.pending.find(item => item.id === itemId);
-        if (item) {
-            setData(prev => ({
-                ...prev,
-                [activeMainTab]: {
-                    ...prev[activeMainTab],
-                    pending: prev[activeMainTab].pending.filter(item => item.id !== itemId),
-                    rejected: [...prev[activeMainTab].rejected, { ...item, status: 'rejected', rejectionReason: reason }]
-                }
-            }));
-            setSelectedItems(prev => prev.filter(id => id !== itemId));
-        }
-    };
+    useEffect(() => {
+        fetchAdminData();
+    }, []);
 
-    const handleBulkAction = (action) => {
-        if (selectedItems.length === 0) return;
-
-        selectedItems.forEach(itemId => {
-            if (action === 'approve') {
-                handleApprove(itemId);
-            } else if (action === 'reject') {
-                handleReject(itemId, 'Bulk rejection');
+    // Approve/reject handlers for users, listings, orders
+    const handleApprove = async (itemId) => {
+        setLoading(true);
+        setError(null);
+        try {
+            if (activeMainTab === 'users') {
+                await api.patch(`/users/${itemId}/approve`);
+            } else if (activeMainTab === 'listings') {
+                await api.patch(`/items/${itemId}/approve`);
+            } else if (activeMainTab === 'orders') {
+                await api.patch(`/swaps/${itemId}/complete`);
             }
-        });
-        setSelectedItems([]);
+            await fetchAdminData();
+            setSelectedItems(prev => prev.filter(id => id !== itemId));
+        } catch (err) {
+            setError('Failed to approve');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleReject = async (itemId, reason = '') => {
+        setLoading(true);
+        setError(null);
+        try {
+            if (activeMainTab === 'users') {
+                // Some backends may not have a /users/:id/reject endpoint. If not, implement in backend.
+                await api.patch(`/users/${itemId}/reject`, { reason });
+            } else if (activeMainTab === 'listings') {
+                await api.patch(`/items/${itemId}/reject`, { reason });
+            } else if (activeMainTab === 'orders') {
+                await api.patch(`/swaps/${itemId}/reject`, { reason });
+            }
+            await fetchAdminData();
+            setSelectedItems(prev => prev.filter(id => id !== itemId));
+        } catch (err) {
+            // Show backend error if available
+            setError(err?.response?.data?.error || 'Failed to reject');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBulkAction = async (action) => {
+        if (selectedItems.length === 0) return;
+        setLoading(true);
+        setError(null);
+        try {
+            for (const itemId of selectedItems) {
+                if (action === 'approve') {
+                    await handleApprove(itemId);
+                } else if (action === 'reject') {
+                    await handleReject(itemId, 'Bulk rejection');
+                }
+            }
+            setSelectedItems([]);
+        } catch (err) {
+            setError(err?.response?.data?.error || 'Bulk action failed');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSelectItem = (itemId) => {
